@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ET Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+            background-color: #f0f8ff; /* Light blue background color */
+        }
+        h1 {
+            text-align: center;
+            color: #F66733; /* Clemson University Orange */
+        }
+        .form-container {
+            background-color: #ffffff; /* White background for form */
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        input[type="text"], input[type="number"], input[type="date"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #F66733; /* Clemson Orange */
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #e95e2e; /* Slightly darker Clemson Orange */
+        }
+        .result {
+            background-color: #ffffff; /* White background for results */
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+        .logo {
+            margin-bottom: 20px; /* Space between logo and form */
+        }
+        .chart-container {
+            width: 100%;
+            margin-top: 20px;
+        }
+    </style>
+    <!-- Include Chart.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Clemson University Logo -->
+    <div class="logo">
+        <img src="clemson_logo.png" alt="Clemson University_AGM 4020: Irrigation Design 
+" width="200">
+    </div>
+
+    <h1>Reference ET Calculator</h1>
+
+    <div class="form-container">
+        <div class="form-group">
+            <label for="latitude">Latitude (degrees):</label>
+            <input type="number" id="latitude" placeholder="Enter latitude" step="0.01">
+        </div>
+        <div class="form-group">
+            <label for="date">Date:</label>
+            <input type="date" id="date">
+        </div>
+        <div class="form-group">
+            <label for="tmin">Minimum Temperature (°C):</label>
+            <input type="number" id="tmin" placeholder="Enter minimum temperature" step="0.1">
+        </div>
+        <div class="form-group">
+            <label for="tmax">Maximum Temperature (°C):</label>
+            <input type="number" id="tmax" placeholder="Enter maximum temperature" step="0.1">
+        </div>
+        <div class="form-group">
+            <label for="solar_radiation">Solar Radiation (MJ/m²/day):</label>
+            <input type="number" id="solar_radiation" placeholder="Enter solar radiation" step="0.1">
+        </div>
+        <div class="form-group">
+            <label for="humidity">Relative Humidity (%):</label>
+            <input type="number" id="humidity" placeholder="Enter relative humidity" step="0.1">
+        </div>
+        <div class="form-group">
+            <label for="wind_speed">Wind Speed (m/s):</label>
+            <input type="number" id="wind_speed" placeholder="Enter wind speed" step="0.1">
+        </div>
+        <button onclick="calculateET()">Calculate ET</button>
+    </div>
+
+    <div class="result" id="result"></div>
+
+    <div class="chart-container">
+        <canvas id="etChart"></canvas>
+    </div>
+
+    <script>
+        function calculateET() {
+            // Get input values
+            const latitude = parseFloat(document.getElementById('latitude').value);
+            const date = new Date(document.getElementById('date').value);
+            const tmin = parseFloat(document.getElementById('tmin').value);
+            const tmax = parseFloat(document.getElementById('tmax').value);
+            const solar_radiation = parseFloat(document.getElementById('solar_radiation').value);
+            const humidity = parseFloat(document.getElementById('humidity').value);
+            const wind_speed = parseFloat(document.getElementById('wind_speed').value);
+
+            // Check for valid input values
+            if (isNaN(latitude) || isNaN(tmin) || isNaN(tmax) || isNaN(solar_radiation) || isNaN(humidity) || isNaN(wind_speed) || !date) {
+                alert("Please fill in all fields with valid values.");
+                return;
+            }
+
+            // Constants
+            const solar_constant = 0.0820; // Solar constant in MJ/m²/min
+
+            // Calculate Julian day
+            const start = new Date(date.getFullYear(), 0, 0);
+            const diff = date - start + (start.getTimezoneOffset() - date.getTimezoneOffset()) * 60 * 1000;
+            const julian_day = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+            // Calculate Extraterrestrial Radiation (Ra)
+            const dr = 1 + 0.033 * Math.cos((2 * Math.PI / 365) * julian_day); // Inverse relative distance factor
+            const delta = 0.409 * Math.sin((2 * Math.PI / 365) * julian_day - 1.39); // Solar declination
+            const phi = latitude * Math.PI / 180; // Convert latitude to radians
+            const omega_s = Math.acos(-Math.tan(phi) * Math.tan(delta)); // Sunset hour angle
+            const Ra = (24 * 60 / Math.PI) * solar_constant * dr * (omega_s * Math.sin(phi) * Math.sin(delta) + Math.cos(phi) * Math.cos(delta) * Math.sin(omega_s)); // Extraterrestrial radiation in MJ/m²/day
+
+            // Mean temperature
+            const tmean = (tmin + tmax) / 2;
+
+            // Slope of saturation vapor pressure curve (delta_svp)
+            const delta_svp = 4098 * (0.6108 * Math.exp((17.27 * tmean) / (tmean + 237.3))) / Math.pow((tmean + 237.3), 2);
+
+            // Psychrometric constant (gamma)
+            const gamma = 0.665e-3 * 101.3; // Psychrometric constant in kPa/°C
+
+            // Latent heat of vaporization (lambda)
+            const lambda = 2.501 - (2.361 * Math.pow(10, -3)) * tmean; // Latent heat of vaporization in MJ/kg
+
+            // Saturation vapor pressure at Tmin and Tmax
+            const es_tmin = 0.6108 * Math.exp((17.27 * tmin) / (tmin + 237.3)); // es at Tmin
+            const es_tmax = 0.6108 * Math.exp((17.27 * tmax) / (tmax + 237.3)); // es at Tmax
+
+            // Mean Saturation Vapor Pressure
+            const es_mean = (es_tmin + es_tmax) / 2;
+
+            // Actual Vapor Pressure (ea)
+            const ea = (humidity / 100) * es_mean;
+
+            // Hargreaves-Samani Method with Latent Heat of Vaporization
+            const et_hs = 0.0023 * Ra * Math.sqrt(tmax - tmin) * (tmean + 17.8) / lambda;
+
+            // Priestley-Taylor Method with Latent Heat of Vaporization
+            const alpha = 1.26; // Coefficient for Priestley-Taylor
+            const et_pt = (alpha * delta_svp * solar_radiation) / (delta_svp + gamma) / lambda;
+
+            // Calculate Net Shortwave Radiation (Rns)
+            const albedo = 0.23; // Default albedo for a grass reference crop
+            const Rns = (1 - albedo) * solar_radiation; // Net shortwave radiation
+
+            // Calculate Net Longwave Radiation (Rnl)
+            const stefan_boltzmann = 4.903e-9; // Stefan-Boltzmann
+            const Rnl = stefan_boltzmann * (((tmax + 273.16) ** 4 + (tmin + 273.16) ** 4) / 2) 
+                        * (0.34 - 0.14 * Math.sqrt(ea)) 
+                        * (1.35 * (solar_radiation / Ra) - 0.35);
+
+            // Calculate Net Radiation (Rn)
+            const Rn = Rns - Rnl; // Net radiation in MJ/m²/day
+
+            // Penman-Monteith Method with Latent Heat of Vaporization
+            const et_pm = (0.408 * delta_svp * Rn + gamma * (900 / (tmean + 273)) * wind_speed * (es_mean - ea)) 
+                          / (delta_svp + gamma * (1 + 0.34 * wind_speed));
+
+            // Display results in data format
+            document.getElementById('result').innerHTML = `
+                <h2>Reference Evapotranspiration Results</h2>
+                <p><strong>Hargreaves-Samani Method:</strong> ${et_hs.toFixed(2)} mm/day</p>
+                <p><strong>Priestley-Taylor Method:</strong> ${et_pt.toFixed(2)} mm/day</p>
+                <p><strong>Penman-Monteith Method:</strong> ${et_pm.toFixed(2)} mm/day</p>
+            `;
+
+            // Display results in chart format using Chart.js
+            const ctx = document.getElementById('etChart').getContext('2d');
+            const etChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Hargreaves-Samani', 'Priestley-Taylor', 'Penman-Monteith'],
+                    datasets: [{
+                        label: 'ET (mm/day)',
+                        data: [et_hs.toFixed(2), et_pt.toFixed(2), et_pm.toFixed(2)],
+                        backgroundColor: ['#F66733', '#FF8800', '#FFBB33'], // Clemson Orange shades
+                        borderColor: ['#E65A2C', '#E67C00', '#E6A00C'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'ET (mm/day)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
