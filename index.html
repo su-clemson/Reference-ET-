@@ -172,10 +172,6 @@
             // Hargreaves-Samani Method with Latent Heat of Vaporization
             const et_hs = 0.0023 * Ra * Math.sqrt(tmax - tmin) * (tmean + 17.8) / lambda;
 
-            // Priestley-Taylor Method with Latent Heat of Vaporization
-            const alpha = 1.26; // Coefficient for Priestley-Taylor
-            const et_pt = (alpha * delta_svp * solar_radiation) / (delta_svp + gamma) / lambda;
-
             // Calculate Net Shortwave Radiation (Rns)
             const albedo = 0.23; // Default albedo for a grass reference crop
             const Rns = (1 - albedo) * solar_radiation; // Net shortwave radiation
@@ -184,11 +180,14 @@
             const stefan_boltzmann = 4.903e-9; // Stefan-Boltzmann
             const Rnl = stefan_boltzmann * (((tmax + 273.16) ** 4 + (tmin + 273.16) ** 4) / 2) 
                         * (0.34 - 0.14 * Math.sqrt(ea)) 
-                        * (1.35 * (solar_radiation / Ra) - 0.35);
+                        * (1.35 * 4/3*(solar_radiation / Ra) - 0.35);
 
             // Calculate Net Radiation (Rn)
             const Rn = Rns - Rnl; // Net radiation in MJ/m²/day
-
+           // Priestley-Taylor Method with Latent Heat of Vaporization
+            const alpha = 1.26; // Coefficient for Priestley-Taylor
+            const et_pt = (alpha * delta_svp * Rn) / (delta_svp + gamma) / lambda;
+            
             // Penman-Monteith Method with Latent Heat of Vaporization
             const et_pm = (0.408 * delta_svp * Rn + gamma * (900 / (tmean + 273)) * wind_speed * (es_mean - ea)) 
                           / (delta_svp + gamma * (1 + 0.34 * wind_speed));
